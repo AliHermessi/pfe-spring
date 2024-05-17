@@ -1,0 +1,97 @@
+package com.project.controllers;
+
+import com.project.dto.FournisseurDTO;
+import com.project.models.Fournisseur;
+import com.project.repositories.FournisseurRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.stream.Collectors;
+import com.project.*;
+
+@RestController
+@RequestMapping("/fournisseurs")
+public class FournisseurController {
+
+    @Autowired
+    private FournisseurRepository fournisseurRepository;
+
+    @GetMapping("/getAll")
+    public ResponseEntity<List<FournisseurDTO>> getAllFournisseurs() {
+        List<Fournisseur> fournisseurs = fournisseurRepository.findAll();
+
+        List<FournisseurDTO> fournisseurDTOs = fournisseurs.stream()
+                .map(fournisseur -> {
+                    FournisseurDTO dto = new FournisseurDTO();
+                    dto.setId(fournisseur.getId());
+                    dto.setNom(fournisseur.getNom());
+                    dto.setAddress(fournisseur.getAddress());
+                    dto.setNumero(fournisseur.getNumero());
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(fournisseurDTOs);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<FournisseurDTO> getFournisseurById(@PathVariable Long id) {
+        return fournisseurRepository.findById(id)
+                .map(fournisseur -> {
+                    FournisseurDTO dto = new FournisseurDTO();
+                    dto.setId(fournisseur.getId());
+                    dto.setNom(fournisseur.getNom());
+                    dto.setAddress(fournisseur.getAddress());
+                    dto.setNumero(fournisseur.getNumero());
+                    return ResponseEntity.ok(dto);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/add")
+    public ResponseEntity<FournisseurDTO> addFournisseur(@RequestBody FournisseurDTO fournisseurDTO) {
+        Fournisseur fournisseur = new Fournisseur();
+        fournisseur.setNom(fournisseurDTO.getNom());
+        fournisseur.setAddress(fournisseurDTO.getAddress());
+        fournisseur.setNumero(fournisseurDTO.getNumero());
+
+        Fournisseur savedFournisseur = fournisseurRepository.save(fournisseur);
+
+        fournisseurDTO.setId(savedFournisseur.getId());
+
+        return ResponseEntity.ok(fournisseurDTO);
+    }
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<FournisseurDTO> updateFournisseur(@PathVariable Long id, @RequestBody FournisseurDTO fournisseurDTO) {
+        return fournisseurRepository.findById(id)
+                .map(existingFournisseur -> {
+                    existingFournisseur.setNom(fournisseurDTO.getNom());
+                    existingFournisseur.setAddress(fournisseurDTO.getAddress());
+                    existingFournisseur.setNumero(fournisseurDTO.getNumero());
+
+                    Fournisseur updatedFournisseur = fournisseurRepository.save(existingFournisseur);
+
+                    FournisseurDTO updatedDto = new FournisseurDTO();
+                    updatedDto.setId(updatedFournisseur.getId());
+                    updatedDto.setNom(updatedFournisseur.getNom());
+                    updatedDto.setAddress(updatedFournisseur.getAddress());
+                    updatedDto.setNumero(updatedFournisseur.getNumero());
+
+                    return ResponseEntity.ok(updatedDto);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<Void> deleteFournisseur(@PathVariable Long id) {
+        if (fournisseurRepository.existsById(id)) {
+            fournisseurRepository.deleteById(id);
+            return ResponseEntity.noContent().build();
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+}

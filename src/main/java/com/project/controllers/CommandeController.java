@@ -1,10 +1,13 @@
 package com.project.controllers;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.dto.CommandeDTO;
 import com.project.dto.ElementFactureDTO;
 import com.project.dto.ProduitDTO;
 import com.project.models.*;
 import com.project.repositories.*;
+import com.project.services.LogService;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,6 +27,7 @@ import static com.project.models.Facture.generateFactureCode;
 @RestController
 @RequestMapping("/commandes")
 public class CommandeController {
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private CommandeRepository commandeRepository;
@@ -39,7 +43,8 @@ public class CommandeController {
     private ProduitRepository produitRepository;
     @Autowired
     private ElementFactureRepository elementFactureRepository;
-
+    @Autowired
+    private LogService logService;
     @GetMapping("/getAll")
     public ResponseEntity<List<CommandeDTO>> getAllCommandes() {
         List<Commande> commandes = commandeRepository.findAll();
@@ -49,13 +54,27 @@ public class CommandeController {
 
     @PostMapping("/createFacture")
     public ResponseEntity<Facture> createAndGenerateFacture(@RequestBody Commande commande) {
-        commandeRepository.save(commande);
-        Facture facture = new Facture();
-        facture.setElementsFacture(commande.getElementsFacture());
-        facture.setCommande(commande);
-        factureRepository.save(facture);
-        return ResponseEntity.ok(facture);
+        try {
+            // Save the Commande
+            commandeRepository.save(commande);
+
+            // Create and save the Facture
+            Facture facture = new Facture();
+            facture.setElementsFacture(commande.getElementsFacture());
+            facture.setCommande(commande);
+            factureRepository.save(facture);
+
+            // Log the creation of the Facture
+            logService.saveLog("Facture", facture.getId(), "create", null, null);
+
+            return ResponseEntity.ok(facture);
+        } catch (Exception e) {
+            // Handle any exceptions
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
+
 
     @PostMapping("/SaveCommande")
     public ResponseEntity<String> SaveCommande(@RequestBody CommandeDTO commandeDTO) {
@@ -120,6 +139,34 @@ public class CommandeController {
 
                 Optional<Produit> produitOptional = produitRepository.findById(elementFactureDTO.getProduitId());
                 Produit produit = produitOptional.get();
+
+
+                if (produitOptional.isPresent()) {
+                    produit = produitOptional.get();
+                } else {
+                    // Product doesn't exist, create a new one
+                    produit = new Produit();
+                    // Set product details from the ElementFactureDTO
+
+                    produit.setLibelle(elementFactureDTO.getLibelle()); // Assuming the DTO has a product name field
+                    produit.setDescription("Added from Commande ID: " + commande.getId()); // Custom description
+                    produit.setPrix(elementFactureDTO.getPrix());
+                    produit.setCout(elementFactureDTO.getPrix());
+                    produit.setTax((int)elementFactureDTO.getTax());
+                    produit.setQuantite(elementFactureDTO.getQuantity());
+                    produit.setBarcode(Produit.generateBarcodeWithReturn(produit));
+                    // Save the new product
+                    produit = produitRepository.save(produit);
+                    // Log the creation of the new product
+                    logService.saveLog("Produit", produit.getId(),
+                            "add Produit créé à partir de Commande ID: " + commande.getId(),
+                            null, objectMapper.writeValueAsString(produit));
+                }
+
+
+
+
+
                 if ("IN".equals(commande.getType_commande())) {
                     // If it's an incoming command
                     produit.setCout(elementFactureDTO.getPrix()); // Set cout to the prix from ElementFacture
@@ -173,6 +220,13 @@ public class CommandeController {
             // Update and save the Commande entity with the Facture entity
             commande.setFacture(facture);
             commandeRepository.save(commande);
+            try {
+                logService.saveLog("Commande", commande.getId(),
+                        "Saving Commande", null, objectMapper.writeValueAsString(commandeDTO));
+            } catch (JsonProcessingException e) {
+                e.printStackTrace(); // Handle exception properly
+            }
+
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             e.printStackTrace();
@@ -183,18 +237,45 @@ public class CommandeController {
 
     @PostMapping("/ConvertirCommandeEtCreerFacture")
     public ResponseEntity<Void> convertirCommande(@RequestBody Long id) {
-        System.out.print(id);
-       Optional<Commande> commandeOpt = commandeRepository.findById(id);
-       Commande commande=commandeOpt.get();
-       Facture facture = commande.getFacture();
-       facture.setGenerated(Boolean.TRUE);
-       facture.setDateFacture(LocalDateTime.now());
-       factureRepository.save(facture);
+        try {
+            // Retrieve Commande entity by ID
+            Optional<Commande> commandeOpt = commandeRepository.findById(id);
+            if (commandeOpt.isEmpty()) {
+                // Handle case where Commande with given ID is not found
+                return ResponseEntity.notFound().build();
+            }
 
-       commandeRepository.save(commande);
-       System.out.print(commande.getFacture().getCode());
-       return  ResponseEntity.ok().build();
+            Commande commande = commandeOpt.get();
+
+            // Log before converting Commande
+           // String oldValue = objectMapper.writeValueAsString(commande);
+
+            // Convert Commande and update Facture
+            Facture facture = commande.getFacture();
+            facture.setGenerated(Boolean.TRUE);
+            facture.setDateFacture(LocalDateTime.now());
+            facture.setCode(Facture.generateFactureCode());
+            facture.setMontantTotalttc(commande.getMontantTotalttc());
+            facture.setMontantTotalht(commande.getMontantTotalht());
+            facture.setTotalRemise(commande.getTotalRemise());
+            facture.setTotalTax(commande.getTotalTax());
+            factureRepository.save(facture);
+
+            // Save updated Commande
+            commandeRepository.save(commande);
+
+            // Log after converting Commande
+          //  String newValue = objectMapper.writeValueAsString(commande);
+            logService.saveLog("Facture", id, "Convertir Commande et Creer Facture", "", "");
+
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            // Handle JSON processing exception
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
+
 
 
 
@@ -210,13 +291,32 @@ public class CommandeController {
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Void> deleteCommande(@PathVariable Long id) {
-        if (commandeRepository.existsById(id)) {
+        try {
+            // Check if Commande with given ID exists
+            Optional<Commande> existingCommandeOpt = commandeRepository.findById(id);
+            if (existingCommandeOpt.isEmpty()) {
+                // Handle case where Commande with given ID is not found
+                return ResponseEntity.notFound().build();
+            }
+
+            // Log before deleting Commande
+            Commande existingCommande = existingCommandeOpt.get();
+            String oldValue = objectMapper.writeValueAsString(existingCommande);
+
+            // Delete Commande
             commandeRepository.deleteById(id);
+
+            // Log after deleting Commande
+            logService.saveLog("Commande", id, "delete", oldValue, null);
+
             return ResponseEntity.noContent().build();
-        } else {
-            return ResponseEntity.notFound().build();
+        } catch (JsonProcessingException e) {
+            // Handle JSON processing exception
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
 
     private CommandeDTO convertToDTO(Commande commande) {
         CommandeDTO commandeDTO = new CommandeDTO();

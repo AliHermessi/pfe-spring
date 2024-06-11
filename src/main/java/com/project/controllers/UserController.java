@@ -1,23 +1,37 @@
 package com.project.controllers;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.dto.UserDTO;
 import com.project.models.Role;
 import com.project.models.User;
+import com.project.repositories.RoleRepository;
 import com.project.repositories.UserRepository;
+import com.project.services.LogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.List;
+
 @RestController
 @RequestMapping("/users")
 public class UserController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private LogService logService;
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @GetMapping("/getAll")
     public ResponseEntity<List<UserDTO>> getAllUsers() {
@@ -38,20 +52,63 @@ public class UserController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<Void> addUser(@RequestBody User user) {
-        userRepository.save(user);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<UserDTO> addUser(@RequestBody UserDTO userDTO) {
+        User user = new User();
+        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+        user.setCin(userDTO.getCin());
+        user.setUsername(userDTO.getUsername());
+        user.setPassword(passwordEncoder.encode(userDTO.getPassword())); // Encrypt the password
+
+        List<Role> roles = userDTO.getRole().stream()
+                .map(roleName -> roleRepository.findByRoleName(roleName)
+                        .orElseThrow(() -> new RuntimeException("Role not found: " + roleName)))
+                .collect(Collectors.toList());
+        user.setRole(roles);
+
+        User savedUser = userRepository.save(user);
+
+        try {
+            String newValue = objectMapper.writeValueAsString(savedUser);
+            logService.saveLog("User", savedUser.getId(), "add", "", newValue); // Log the addition with no old value
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+
+        return ResponseEntity.ok().build(); // Return response indicating success
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<UserDTO> updateUser(@PathVariable Long id, @RequestBody User newUser) {
-        User existingUser = userRepository.findById(id).orElse(null);
-        if (existingUser != null) {
-            existingUser.setUsername(newUser.getUsername());
-            existingUser.setCin(newUser.getCin());
-            existingUser.setPassword(newUser.getPassword());
-            existingUser.setRole(newUser.getRole());  // Assuming roles are stored as a list in User entity
+    public ResponseEntity<UserDTO> updateUser(@PathVariable Long id, @RequestBody UserDTO updatedUserDTO) {
+        Optional<User> existingUserOpt = userRepository.findById(id);
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+
+            String oldValue = "";
+            String newValue = "";
+            try {
+                oldValue = objectMapper.writeValueAsString(existingUser);
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+            }
+
+            existingUser.setUsername(updatedUserDTO.getUsername());
+            existingUser.setCin(updatedUserDTO.getCin());
+
+            List<Role> roles = updatedUserDTO.getRole().stream()
+                    .map(roleName -> roleRepository.findByRoleName(roleName)
+                            .orElseThrow(() -> new RuntimeException("Role not found: " + roleName)))
+                    .collect(Collectors.toList());
+            existingUser.setRole(roles);
+
             userRepository.save(existingUser);
+
+            try {
+                newValue = objectMapper.writeValueAsString(existingUser);
+                logService.saveLog("User", existingUser.getId(), "update", oldValue, newValue);
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+            }
 
             UserDTO userDTO = convertToDTO(existingUser);
             return ResponseEntity.ok(userDTO);
@@ -60,10 +117,23 @@ public class UserController {
         }
     }
 
+
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        if (userRepository.existsById(id)) {
+        Optional<User> existingUserOpt = userRepository.findById(id);
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+            String oldValue = "";
+            try {
+                oldValue = objectMapper.writeValueAsString(existingUser);
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+            }
+
             userRepository.deleteById(id);
+
+            logService.saveLog("User", id, "delete", oldValue, "");
+
             return ResponseEntity.noContent().build();
         } else {
             return ResponseEntity.notFound().build();
@@ -82,12 +152,8 @@ public class UserController {
                 user.getCin(),
                 user.getPassword(),
                 roleNames
-
-
-
         );
     }
-
 
     private List<UserDTO> convertToDTOs(List<User> users) {
         return users.stream().map(this::convertToDTO).collect(Collectors.toList());

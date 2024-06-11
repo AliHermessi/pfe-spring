@@ -1,5 +1,6 @@
 package com.project.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.dto.AuthRequest;
 import com.project.dto.AuthResponse;
 import com.project.models.Entreprise;
@@ -7,6 +8,7 @@ import com.project.models.Role;
 import com.project.models.User;
 import com.project.repositories.EntrepriseRepository;
 import com.project.repositories.UserRepository;
+import com.project.services.LogService;
 import com.project.services.UserDetailsServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,7 +37,10 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final UserDetailsService userDetailsService;
+    @Autowired
+    private LogService logService;
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     @Autowired
     public AuthController(AuthenticationManager authenticationManager, UserRepository userRepository, UserDetailsService userDetailsService) {
         this.authenticationManager = authenticationManager;
@@ -70,6 +75,7 @@ public class AuthController {
             roles.add(role.getRoleName());
         }
 
+        System.out.println("user and role"+user.getCin()+user.getRole());
         if (roles.isEmpty()) {
             System.out.println("No roles found for user with cin: " + authenticationRequest.getCin());
             return ResponseEntity.badRequest().body("No roles found for the user");
@@ -81,18 +87,19 @@ public class AuthController {
 
 
     @GetMapping("/Retrieve_Username_ByCin")
-    public ResponseEntity<String> retrieveUsernameByCin(@RequestParam String cin) {
+    public ResponseEntity<User> retrieveUsernameByCin(@RequestParam String cin) {
         String username = null;
         List<User> users = userRepository.findAll();
+        User userr = null;
         for (User user : users) {
             if (user.getCin().equals(cin)) {
-                username = user.getUsername(); // Assuming getUsername method exists in User entity
-                break;
+                userr = user;
+                return ResponseEntity.ok(userr);// Assuming getUsername method exists in User entity
             }
         }
-        if (username != null) {
+        if (userr != null) {
             System.out.println("Username for Cin " + cin + ": " + username);
-            return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(username);
+            return ResponseEntity.ok(userr);
         } else {
             System.out.println("Username not found for Cin: " + cin);
             return ResponseEntity.notFound().build();

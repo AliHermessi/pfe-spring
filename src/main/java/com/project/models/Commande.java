@@ -2,6 +2,7 @@ package com.project.models;
 import java.time.LocalDateTime;
 import java.util.Random;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -19,10 +20,16 @@ public class Commande {
 
     @OneToOne
     @JoinColumn(name = "facture_id", referencedColumnName = "id")
+    @JsonManagedReference
     private Facture facture;
 
     private LocalDateTime dateCommande;
     private BigDecimal montantTotal;
+    private double montantTotalht;
+    private double montantTotalttc;
+
+    private double totalTax;
+    private double totalRemise;
 
     private String codeCommande;
     private String type_commande;
@@ -34,6 +41,7 @@ public class Commande {
     private Fournisseur fournisseur;
 
     @OneToMany(mappedBy = "commande", cascade = CascadeType.ALL)
+    @JsonManagedReference
     private List<ElementFacture> elementsFacture;
 
 
@@ -49,6 +57,39 @@ public class Commande {
         int randomNumber = 1000 + random.nextInt(9000);
 
         return Integer.toString(randomNumber);
+    }
+
+
+    public double getMontantTotalht() {
+        return montantTotalht;
+    }
+
+    public void setMontantTotalht(double montantTotalht) {
+        this.montantTotalht = montantTotalht;
+    }
+
+    public double getMontantTotalttc() {
+        return montantTotalttc;
+    }
+
+    public void setMontantTotalttc(double montantTotalttc) {
+        this.montantTotalttc = montantTotalttc;
+    }
+
+    public double getTotalTax() {
+        return totalTax;
+    }
+
+    public void setTotalTax(double totalTax) {
+        this.totalTax = totalTax;
+    }
+
+    public double getTotalRemise() {
+        return totalRemise;
+    }
+
+    public void setTotalRemise(double totalRemise) {
+        this.totalRemise = totalRemise;
     }
 
     public List<ElementFacture> getElementsFacture() {

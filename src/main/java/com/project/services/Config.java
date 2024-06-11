@@ -17,11 +17,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 
 import static org.springframework.security.authorization.AuthenticatedAuthorizationManager.authenticated;
 
 @Configuration
 @EnableWebSecurity
+@EnableWebSocketMessageBroker
 @EnableMethodSecurity
 @ComponentScan(basePackages = "com.project.services")
 public class Config {
@@ -31,6 +33,7 @@ public class Config {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
         RequestMatcher loginRequestMatcher = new AntPathRequestMatcher("/auth/login");
         http.authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests

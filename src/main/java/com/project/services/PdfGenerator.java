@@ -15,6 +15,7 @@ import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.*;
 
 import com.itextpdf.layout.properties.HorizontalAlignment;
+import com.itextpdf.layout.properties.TextAlignment;
 import com.project.dto.ElementFactureDTO;
 import com.project.dto.FactureDTO;
 
@@ -39,7 +40,7 @@ public class PdfGenerator {
         PdfWriter writer = new PdfWriter(outputStream);
         PdfDocument pdf = new PdfDocument(writer);
         Document document = new Document(pdf, PageSize.A4);
-        int numElementsPerPage = 12;
+        int numElementsPerPage = 15;
         // Calculate the number of pages needed
         int numElements = facture.getElementFactures().size();
         int numPages = (int) Math.ceil((double) numElements / numElementsPerPage);
@@ -61,7 +62,7 @@ public class PdfGenerator {
 
             // Add total info
             addTotalInfo(document, facture);
-            addFooter(document,entreprise);
+            addFooter(document,entreprise,page);
         }
 
         document.close();
@@ -72,39 +73,50 @@ public class PdfGenerator {
 
     private static void addFactureInfo(Document document, FactureDTO facture, Entreprise entreprise, String user) {
         try {
-            Color LIGHT_GRAY = WebColors.getRGBColor("LIGHT_GRAY");
             PdfFont font = PdfFontFactory.createFont();
+            Color LIGHT_GRAY = WebColors.getRGBColor("#000000");
 
-            // Left block for Facture and Date
-            Paragraph leftBlock = new Paragraph()
-                    .setFont(font).setFontSize(12).setFontColor(DeviceRgb.BLACK);
-            leftBlock.add(new Text("Facture: ").setBold());
-            leftBlock.add(facture.getCode() + "\n");
-            leftBlock.add(new Text("Date: ").setBold());
-            leftBlock.add(facture.getDateFacture() + "\n");
+            // Create a table for the total info
+            Table totalInfoTable = new Table(new float[]{500, 500});
+            totalInfoTable.setWidth(500);
+            totalInfoTable.setBorder(new SolidBorder(LIGHT_GRAY, 0.5f, 1));
 
-            // Right block for Client/Fournisseur
-            String clientOrFournisseur = facture.getNomClient() != null ? "Client: " + facture.getNomClient() : "Fournisseur: " + facture.getNomFournisseur();
-            Paragraph rightBlock = new Paragraph(clientOrFournisseur)
-                    .setFont(font).setFontSize(12).setFontColor(DeviceRgb.BLACK);
+            // Add content to the left column
+            Cell leftCell = new Cell();
+            leftCell.add(new Paragraph("Eclairage moderne").setFontSize(20).setBold().setHorizontalAlignment(HorizontalAlignment.CENTER));
+            leftCell.add(new Paragraph(facture.getNomClient() != null ? "Client: " + facture.getNomClient() : "Fournisseur: " + facture.getNomFournisseur()));
+            totalInfoTable.addCell(leftCell);
 
-            // Separation line
-            LineSeparator line = new LineSeparator(new SolidLine());
-            line.setStrokeColor(LIGHT_GRAY);
+            // Add content to the right column
+            Cell rightCell = new Cell();
+            rightCell.add(new Paragraph("FACTURE").setFontSize(20).setBold().setHorizontalAlignment(HorizontalAlignment.CENTER));
+            rightCell.add(new Paragraph("Code: " + facture.getCode()));
+            rightCell.add(new Paragraph("Date: " + facture.getDateFacture()));
+            totalInfoTable.addCell(rightCell);
+            totalInfoTable.setHorizontalAlignment(HorizontalAlignment.CENTER);
+            // Create a table for the operator and date
+            Table operatorTable = new Table(new float[]{500});
+            operatorTable.setWidth(500);
+            operatorTable.addCell(new Cell().add(new Paragraph("Operateur: " + user).setFontSize(12)).setWidth(250));
+            operatorTable.addCell(new Cell().add(new Paragraph("Date: " +
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss")))
+                    .setFontSize(12)).setWidth(250));
+            operatorTable.setHorizontalAlignment(HorizontalAlignment.CENTER);
 
-            // Small block for Operator and Date
-            Paragraph smallBlock = new Paragraph()
-                    .setFont(font).setFontSize(12).setFontColor(DeviceRgb.BLACK).setBorder(new SolidBorder(DeviceRgb.BLACK, 1));
-            smallBlock.add(new Text("Operateur: ").setBold());
-            smallBlock.add(user + "\n");
-            smallBlock.add(new Text("Date: ").setBold());
-            smallBlock.add(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss")));
+            // Create an empty ta ble
+            Table emptyTable = new Table(new float[]{500, 500, 500, 500});
+            for (int i = 0; i < 4; i++) {
+                emptyTable.addCell(new Paragraph("test "+i));
+            }
+            emptyTable.setHorizontalAlignment(HorizontalAlignment.CENTER);
+            emptyTable.setWidth(500);
+            // Add the operator table and empty table to the document
+            document.add(totalInfoTable);
+            document.add(new Paragraph(" ")); // Add an empty paragraph for spacing
+            document.add(operatorTable);
+            document.add(new Paragraph(" ")); // Add an empty paragraph for spacing
+            document.add(emptyTable);
 
-            // Adding blocks to document
-            document.add(leftBlock);
-            document.add(rightBlock);
-            document.add(line);
-            document.add(smallBlock);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -118,7 +130,7 @@ public class PdfGenerator {
     private static void addElementFactures(Document document, List<ElementFactureDTO> elements) {
         try {
             PdfFont font = PdfFontFactory.createFont();
-            Color LIGHT_GRAY = WebColors.getRGBColor("LIGHT_GRAY");
+            Color LIGHT_GRAY = WebColors.getRGBColor("D3D3D3");
             document.add(new Paragraph("\n\n").setFont(font).setFontSize(12).setFontColor(DeviceGray.BLACK));
 
 
@@ -255,7 +267,7 @@ public class PdfGenerator {
 
             }
             for (int i = 0; i < numEmptyLines; i++) {
-                cell = new Cell().add(new Paragraph("").setFont(font).setFontSize(12).setFontColor(DeviceGray.BLACK));
+                cell = new Cell().add(new Paragraph("\n").setFont(font).setFontSize(12).setFontColor(DeviceGray.BLACK));
                 cell.setBorderTop(Border.NO_BORDER);
                 cell.setBorderBottom(i == numEmptyLines - 1 ? new SolidBorder(DeviceGray.GRAY, 0.5f) : Border.NO_BORDER); // Add bottom border only to the last empty row
                 cell.setBorderLeft(new SolidBorder(DeviceGray.GRAY, 0.5f)); // Add left border
@@ -335,13 +347,13 @@ public class PdfGenerator {
             totalTable.addCell(new Cell().add(new Paragraph("Total TVA: " + facture.getTotalTax() )).setFont(font).setFontSize(12).setFontColor(DeviceRgb.BLACK));
             totalTable.addCell(new Cell().add(new Paragraph("Total remise: " + facture.getTotalRemise())).setFont(font).setFontSize(12).setFontColor(DeviceRgb.BLACK));
             totalTable.addCell(new Cell().add(new Paragraph("Total TTC: " + facture.getMontantTotalttc())).setFont(font).setFontSize(12).setFontColor(DeviceRgb.BLACK));
-            totalTable.setHorizontalAlignment(HorizontalAlignment.RIGHT);
+            totalTable.setHorizontalAlignment(HorizontalAlignment.CENTER);
             document.add(totalTable);     } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static void addFooter(Document document, Entreprise entreprise) {
+    private static void addFooter(Document document, Entreprise entreprise,int Number) {
         try {
             PageSize pageSize = document.getPdfDocument().getDefaultPageSize();
             PdfFont font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
@@ -349,7 +361,7 @@ public class PdfGenerator {
             // Footer text
             String address = "Address: " + entreprise.getAdresse();
             String codePostal = "Code Postal: " + entreprise.getCodePostal();
-            String pageNumber = "Page " + document.getPdfDocument().getPageNumber(document.getPdfDocument().getLastPage()) + " / " + document.getPdfDocument().getNumberOfPages();
+            String pageNumber = "Page " + Number + " / " + document.getPdfDocument().getNumberOfPages();
             String identifiant = "Identifiant Unique: " + entreprise.getIdentifiantUnique();
             String ccb = "C.C.B: " + entreprise.getCompteCourant();
 
@@ -362,7 +374,7 @@ public class PdfGenerator {
             // Add cells for footer information
             Cell leftCell = new Cell().add(new Paragraph(address + "\n" + codePostal).setFont(font).setFontSize(7));
             leftCell.setBorder(Border.NO_BORDER);
-            Cell centerCell = new Cell().add(new Paragraph(pageNumber).setFont(font).setFontSize(9));
+            Cell centerCell = new Cell().add(new Paragraph(pageNumber).setFont(font).setFontSize(10));
             centerCell.setBorder(Border.NO_BORDER);
             Cell rightCell = new Cell().add(new Paragraph(identifiant + "\n" + ccb).setFont(font).setFontSize(7));
             rightCell.setBorder(Border.NO_BORDER);
@@ -374,7 +386,7 @@ public class PdfGenerator {
 
             // Set the fixed position for the table
             table.setFixedLayout();
-            table.setFixedPosition(0, pageSize.getBottom() + 30, pageSize.getWidth());
+            table.setFixedPosition(pageSize.getWidth() / 2 - 250, pageSize.getBottom() + 30, 500);
 
             // Add the table to the document
             document.add(table);
@@ -382,6 +394,7 @@ public class PdfGenerator {
             e.printStackTrace();
         }
     }
+
 
 
 

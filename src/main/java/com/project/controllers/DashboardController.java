@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -141,6 +142,7 @@ public class DashboardController {
         totalvalues.setTotalFacture(factureRepository.findAll().size());
 
         for (CommandeDTO commande : filteredCommandeDTOs) {
+            totalvalues.setTotalSales(totalvalues.getTotalSales()+commande.getElementsFacture().size());
             for (ElementFactureDTO element : commande.getElementsFacture()) {
                 double cost = 0;
                 if (commande.getType_commande().equals("IN")) {
@@ -205,6 +207,35 @@ public class DashboardController {
         }
 
         return mergedRecords;
+    }
+
+    private final DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
+
+    @GetMapping("/pourcentagePVE")
+    public ResponseEntity<Double> comparePVE(
+            @RequestParam String start1,
+            @RequestParam String end1,
+            @RequestParam String start2,
+            @RequestParam String end2) {
+
+        LocalDateTime startDateTime1 = LocalDateTime.parse(start1, formatter);
+        LocalDateTime endDateTime1 = LocalDateTime.parse(end1, formatter);
+        LocalDateTime startDateTime2 = LocalDateTime.parse(start2, formatter);
+        LocalDateTime endDateTime2 = LocalDateTime.parse(end2, formatter);
+
+        List<PVE> records1 = getRecordProduitsInInterval(startDateTime1, endDateTime1);
+        List<PVE> records2 = getRecordProduitsInInterval(startDateTime2, endDateTime2);
+
+        double totalNetHT1 = records1.stream().mapToDouble(PVE::getTotal).sum();
+        double totalNetHT2 = records2.stream().mapToDouble(PVE::getTotal).sum();
+
+        if (totalNetHT1 == 0 || totalNetHT2 == 0) {
+            return ResponseEntity.badRequest().body(0.0); // Avoid division by zero
+        }
+
+        double growthPercentage = ((totalNetHT2 - totalNetHT1) / totalNetHT1) * 100;
+
+        return ResponseEntity.ok(growthPercentage);
     }
 
 

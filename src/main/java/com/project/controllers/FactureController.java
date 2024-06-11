@@ -1,5 +1,7 @@
 package com.project.controllers;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.dto.ElementFactureDTO;
 import com.project.dto.FactureDTO;
 import com.project.models.Commande;
@@ -7,6 +9,7 @@ import com.project.models.ElementFacture;
 import com.project.models.Entreprise;
 import com.project.models.Facture;
 import com.project.repositories.*;
+import com.project.services.LogService;
 import com.project.services.PdfGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -40,7 +43,10 @@ public class FactureController {
 
 @Autowired
 private ElementFactureRepository elementFactureRepository;
+    @Autowired
+    private LogService logService;
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     @GetMapping("/get/{id}")
     public ResponseEntity<FactureDTO> getFactureById(@PathVariable Long id) {
         Optional<Facture> factureOpt = factureRepository.findById(id);
@@ -77,40 +83,57 @@ private ElementFactureRepository elementFactureRepository;
 
     @PostMapping("/add")
     public ResponseEntity<Void> addFacture(@RequestBody FactureDTO factureDTO) {
-        Facture facture = convertToEntity(factureDTO);
-        for (ElementFactureDTO element : factureDTO.getElementFactures()){
-            double netht = (element.getPrix()*element.getQuantity())-
-                    (element.getPrix()*element.getQuantity()*(element.getRemise()/100));
-            double totalRemise = 0;
-            totalRemise = totalRemise + (element.getPrix()*element.getQuantity()*(element.getRemise()/100));
-            double montantht = 0;
-            montantht = montantht + netht;
-            double netttc = netht + (netht * (element.getTax()/100));
-            double totalTax = 0;
-            totalTax = totalTax + (netht * (element.getTax()/100));
-            double montantttc = 0;
-            montantttc = montantttc + netttc;
-            facture.setTotalTax(totalTax);
-            facture.setTotalRemise(totalRemise);
-            facture.setMontantTotalht(montantht);
-            facture.setMontantTotalttc(montantttc);
-            facture.setDateFacture(LocalDateTime.now());
+        try {
+            Facture facture = convertToEntity(factureDTO);
+            for (ElementFactureDTO element : factureDTO.getElementFactures()) {
+                double netht = (element.getPrix() * element.getQuantity()) -
+                        (element.getPrix() * element.getQuantity() * (element.getRemise() / 100));
+                double totalRemise = 0;
+                totalRemise = totalRemise + (element.getPrix() * element.getQuantity() * (element.getRemise() / 100));
+                double montantht = 0;
+                montantht = montantht + netht;
+                double netttc = netht + (netht * (element.getTax() / 100));
+                double totalTax = 0;
+                totalTax = totalTax + (netht * (element.getTax() / 100));
+                double montantttc = 0;
+                montantttc = montantttc + netttc;
+                facture.setTotalTax(totalTax);
+                facture.setTotalRemise(totalRemise);
+                facture.setMontantTotalht(montantht);
+                facture.setMontantTotalttc(montantttc);
+                facture.setDateFacture(LocalDateTime.now());
+            }
+            factureRepository.save(facture);
+            String newValue = objectMapper.writeValueAsString(factureDTO);
+            logService.saveLog("Facture", null, "add", null, newValue);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-        factureRepository.save(facture);
-        return ResponseEntity.ok().build();
     }
-
-
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Void> deleteFacture(@PathVariable Long id) {
-        if (factureRepository.existsById(id)) {
-            factureRepository.deleteById(id);
-            return ResponseEntity.noContent().build();
+        Optional<Facture> factureOpt = factureRepository.findById(id);
+        if (factureOpt.isPresent()) {
+            Facture facture = factureOpt.get();
+            try {
+                String oldValue = objectMapper.writeValueAsString(facture);
+                factureRepository.deleteById(id);
+                logService.saveLog("Facture", id, "delete", oldValue, null);
+                return ResponseEntity.noContent().build();
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            }
         } else {
             return ResponseEntity.notFound().build();
         }
     }
+
+
+
 
     @GetMapping("/getAll")
     public ResponseEntity<List<FactureDTO>> getAllFactures() {

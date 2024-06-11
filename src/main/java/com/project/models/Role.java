@@ -13,7 +13,8 @@ public class Role {
     private String roleName;
 
 
-
+    @ManyToMany
+    private List<Notification> notifications;
 
 
     public Role (){}

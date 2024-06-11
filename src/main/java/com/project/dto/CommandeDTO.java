@@ -18,11 +18,47 @@ public class CommandeDTO {
     private String clientName;
     private Long fournisseur_id;
     private Long client_id;
+    private double montantTotalht;
+    private double montantTotalttc;
 
+    private double totalTax;
+    private double totalRemise;
     private boolean isFactureGenerated;
     private String type_commande;
     private List<ElementFactureDTO> elementsFacture;
     public CommandeDTO() {
+    }
+
+    public double getMontantTotalht() {
+        return montantTotalht;
+    }
+
+    public void setMontantTotalht(double montantTotalht) {
+        this.montantTotalht = montantTotalht;
+    }
+
+    public double getMontantTotalttc() {
+        return montantTotalttc;
+    }
+
+    public void setMontantTotalttc(double montantTotalttc) {
+        this.montantTotalttc = montantTotalttc;
+    }
+
+    public double getTotalTax() {
+        return totalTax;
+    }
+
+    public void setTotalTax(double totalTax) {
+        this.totalTax = totalTax;
+    }
+
+    public double getTotalRemise() {
+        return totalRemise;
+    }
+
+    public void setTotalRemise(double totalRemise) {
+        this.totalRemise = totalRemise;
     }
 
     public String getNumero() {

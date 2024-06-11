@@ -1,5 +1,7 @@
 package com.project.models;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import java.util.List;
@@ -21,14 +23,17 @@ public class ElementFacture {
 
     @ManyToOne
     @JoinColumn(name = "commande_id", referencedColumnName = "id")
+    @JsonBackReference
     private Commande commande;
 
     @ManyToOne
     @JoinColumn(name = "facture_id", referencedColumnName = "id")
+    @JsonBackReference
     private Facture facture;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "produit_id", referencedColumnName = "id")
+    @JsonBackReference
     private Produit produit;
 
     public ElementFacture() {

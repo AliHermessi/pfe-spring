@@ -9,7 +9,9 @@ import com.project.models.*;
 import com.project.repositories.CategorieRepository;
 import com.project.repositories.FournisseurRepository;
 import com.project.repositories.ProduitRepository;
+import com.project.services.LogService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,6 +30,9 @@ import static com.project.models.Produit.generateBarcodeWithReturn;
 @RestController
 @RequestMapping("/produits")
 public class ProduitController {
+    @Autowired
+    private LogService logService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private ProduitRepository produitRepository;
@@ -56,43 +61,39 @@ public class ProduitController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<?> addProduit(@RequestBody Produit produit) {
-        // Log the incoming produit data
-        System.out.println("Received produit: " + produit);
-
-        // Validate the foreign keys before saving
-        if (produit.getCategorie() == null || produit.getCategorie().getId() == null) {
-            return ResponseEntity.badRequest().body("Invalid categorie_id");
-        }
-
-        if (produit.getFournisseur() == null || produit.getFournisseur().getId() == null) {
-            return ResponseEntity.badRequest().body("Invalid fournisseur_id");
-        }
-
-        // Check if the categorie and fournisseur exist in the database
-        if (!categorieRepository.existsById(produit.getCategorie().getId())) {
-            return ResponseEntity.badRequest().body("Categorie does not exist");
-        }
-
-        if (!fournisseurRepository.existsById(produit.getFournisseur().getId())) {
-            return ResponseEntity.badRequest().body("Fournisseur does not exist");
-        }
-
-        // Generate barcode if not provided
-        if (produit.getBarcode() == null || produit.getBarcode().trim().isEmpty()) {
-            produit.setBarcode(generateBarcodeWithReturn(produit));
-        }
-
-        // Set last_update and date_arrivage properly
-        produit.setLast_update(LocalDateTime.now().toString());
+    public ResponseEntity<?> addProduit(@RequestBody ProduitDTO produitDTO) throws JsonProcessingException, ChangeSetPersister.NotFoundException {
+        Produit produit = new Produit();
+        produit.setLibelle(produitDTO.getLibelle());
+        produit.setDescription(produitDTO.getDescription());
+        produit.setPrix(produitDTO.getPrix());
+        produit.setCout(produitDTO.getCout());
+        produit.setMinStock(produitDTO.getMinStock());
+        produit.setMaxStock(produitDTO.getMaxStock());
+        produit.setUnite(produitDTO.getUnite());
+        produit.setTax(produitDTO.getTax());
+        produit.setQuantite(produitDTO.getQuantite());
         produit.setDate_arrivage(LocalDateTime.now().toString());
+        produit.setLast_update(LocalDateTime.now().toString());
+        produit.setStatus(produitDTO.getStatus());
+        produit.setBarcode(generateBarcodeWithReturn(produit));
 
-        // Save the produit
+        // Retrieve Categorie and Fournisseur objects from their IDs
+        Categorie categorie = categorieRepository.findById(produitDTO.getCategorieId())
+                .orElseThrow(() -> new ChangeSetPersister.NotFoundException());
+        Fournisseur fournisseur = fournisseurRepository.findById(produitDTO.getFournisseurId())
+                .orElseThrow(() -> new ChangeSetPersister.NotFoundException());
+
+        produit.setCategorie(categorie);
+        produit.setFournisseur(fournisseur);
+
         produitRepository.save(produit);
 
-        // Return a success response
+        // Log the JSON representation of the produit object
+        logService.saveLog("Produit", produit.getId(), "add", null, objectMapper.writeValueAsString(produit));
+
         return ResponseEntity.ok().build();
     }
+
 
 
 
@@ -103,6 +104,24 @@ public class ProduitController {
         if (existingProduitOpt.isPresent()) {
             Produit existingProduit = existingProduitOpt.get();
 
+            // Save the old state for logging
+            Produit oldProduit = new Produit();
+            oldProduit.setId(existingProduit.getId());
+            oldProduit.setLibelle(existingProduit.getLibelle());
+            oldProduit.setDescription(existingProduit.getDescription());
+            oldProduit.setPrix(existingProduit.getPrix());
+            oldProduit.setTax(existingProduit.getTax());
+            oldProduit.setQuantite(existingProduit.getQuantite());
+            oldProduit.setDate_arrivage(existingProduit.getDate_arrivage());
+            oldProduit.setCategorie(existingProduit.getCategorie());
+            oldProduit.setFournisseur(existingProduit.getFournisseur());
+            oldProduit.setLast_update(existingProduit.getLast_update());
+            oldProduit.setStatus(existingProduit.getStatus());
+            oldProduit.setBarcode(existingProduit.getBarcode());
+            oldProduit.setBrand(existingProduit.getBrand());
+            oldProduit.setCout(existingProduit.getCout());
+
+            // Update the existing product
             existingProduit.setLibelle(newProduit.getLibelle());
             existingProduit.setDescription(newProduit.getDescription());
             existingProduit.setPrix(newProduit.getPrix());
@@ -116,13 +135,20 @@ public class ProduitController {
             existingProduit.setBarcode(newProduit.getBarcode());
             existingProduit.setBrand(newProduit.getBrand());
             existingProduit.setCout(newProduit.getCout());
-            //logs
+
+            // Save the updated product
             produitRepository.save(existingProduit);
-            return ResponseEntity.ok().build();
+
+            // Log the action
+            logService.saveLog("Produit", existingProduit.getId(), "update", oldProduit, existingProduit);
+
+            ProduitDTO produitDTO = convertToDTO(existingProduit);
+            return ResponseEntity.ok(produitDTO);
         } else {
             return ResponseEntity.notFound().build();
         }
     }
+
 
     private ProduitDTO convertToDTO(Produit produit) {
         ProduitDTO produitDTO = new ProduitDTO();
@@ -149,9 +175,14 @@ public class ProduitController {
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Void> deleteProduit(@PathVariable Long id) {
-        if (produitRepository.existsById(id)) {
+        Optional<Produit> existingProduitOpt = produitRepository.findById(id);
+        if (existingProduitOpt.isPresent()) {
+            Produit existingProduit = existingProduitOpt.get();
             produitRepository.deleteById(id);
-            //logs
+
+            // Log the action
+            logService.saveLog("Produit", id, "delete", existingProduit, null);
+
             return ResponseEntity.noContent().build();
         } else {
             return ResponseEntity.notFound().build();

@@ -1,10 +1,13 @@
 package com.project.models;
 
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Random;
 
 @Entity
 @Table(name = "produit")
@@ -54,16 +57,18 @@ public class Produit {
 
     @ManyToOne
     @JoinColumn(name = "categorie_id", referencedColumnName = "id")
+    @JsonIgnore
     private Categorie categorie;
 
     @ManyToOne
     @JoinColumn(name = "fournisseur_id", referencedColumnName = "id")
+    @JsonIgnore
     private Fournisseur fournisseur;
 
-    @OneToMany(fetch = FetchType.LAZY)
-    private List<UserActivity> activities;
+
 
     @OneToMany(mappedBy = "produit", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<ElementFacture> elementFactures;
 
 
@@ -80,8 +85,9 @@ public class Produit {
                 barcodeBuilder.append(word);
             }
         }
-
-        barcodeBuilder.append("Produit");
+        Random random = new Random();
+        int num1 = 100 + random.nextInt(900);
+        barcodeBuilder.append("Produit"+num1);
 
 
         return barcodeBuilder.toString();
@@ -236,13 +242,7 @@ public class Produit {
         this.fournisseur = fournisseur;
     }
 
-    public List<UserActivity> getActivities() {
-        return activities;
-    }
 
-    public void setActivities(List<UserActivity> activities) {
-        this.activities = activities;
-    }
 
 
 }

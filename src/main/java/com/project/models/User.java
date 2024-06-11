@@ -3,6 +3,8 @@ import jakarta.persistence.*;
 
 
 import java.util.List;
+import java.util.Set;
+
 @Entity
 @Table(name = "user")
 public class User {
@@ -27,21 +29,14 @@ public class User {
     )
     private List<Role> role;
 
+    @ManyToMany(mappedBy = "participants")
+    private Set<Conversation> conversations;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    private List<UserActivity> activities;
 
     public User() {
     }
 
-    public User(Long id, String username, String cin, String password, List<Role> role, List<UserActivity> activities) {
-        this.id = id;
-        this.username = username;
-        this.cin = cin;
-        this.password = password;
-        this.role = role;
-        this.activities = activities;
-    }
+
 
     public Long getId() {
         return id;
@@ -83,11 +78,5 @@ public class User {
         this.role = role;
     }
 
-    public List<UserActivity> getActivities() {
-        return activities;
-    }
 
-    public void setActivities(List<UserActivity> activities) {
-        this.activities = activities;
-    }
 }

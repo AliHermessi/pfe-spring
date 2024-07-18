@@ -21,11 +21,18 @@ public class ProduitDTO {
     private int tax;
     private int minStock;
     private int maxStock;
-
+    private boolean isDisponible;
     private int unite;
     public ProduitDTO() {
     }
 
+    public boolean isDisponible() {
+        return isDisponible;
+    }
+
+    public void setDisponible(boolean disponible) {
+        isDisponible = disponible;
+    }
 
     public int getMinStock() {
         return minStock;

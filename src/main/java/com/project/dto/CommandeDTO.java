@@ -1,10 +1,13 @@
 package com.project.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CommandeDTO {
 
     private Long id;
@@ -25,8 +28,18 @@ public class CommandeDTO {
     private double totalRemise;
     private boolean isFactureGenerated;
     private String type_commande;
+    private boolean BDLisPrinted;
+
     private List<ElementFactureDTO> elementsFacture;
     public CommandeDTO() {
+    }
+
+    public boolean isBDLisPrinted() {
+        return BDLisPrinted;
+    }
+
+    public void setBDLisPrinted(boolean BDLisPrinted) {
+        this.BDLisPrinted = BDLisPrinted;
     }
 
     public double getMontantTotalht() {

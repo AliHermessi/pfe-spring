@@ -4,13 +4,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.dto.CategorieDTO;
 import com.project.models.Categorie;
+import com.project.models.Commande;
+import com.project.models.Produit;
 import com.project.repositories.CategorieRepository;
+import com.project.repositories.ProduitRepository;
 import com.project.services.LogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -23,7 +27,8 @@ public class CategorieController {
     private CategorieRepository categorieRepository;
     @Autowired
     private LogService logService;
-
+    @Autowired
+    private ProduitRepository produitRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
     @GetMapping("/getAll")
     public ResponseEntity<List<CategorieDTO>> getAllCategories() {
@@ -40,6 +45,12 @@ public class CategorieController {
         if (categorieOptional.isPresent()) {
             Categorie categorie = categorieOptional.get();
             CategorieDTO categorieDTO = new CategorieDTO(categorie.getId(), categorie.getNom(), categorie.getDescription());
+            List<Long> ids = new ArrayList<>();
+            List<Produit> produits = produitRepository.findByCategorieId(id);
+            for(Produit produit : produits){
+                ids.add(produit.getId());
+            }
+            categorieDTO.setListIdProduit(ids);
             return ResponseEntity.ok(categorieDTO);
         } else {
             return ResponseEntity.notFound().build();
@@ -68,11 +79,11 @@ public class CategorieController {
 
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<CategorieDTO> updateCategorie(@PathVariable Long id, @RequestBody CategorieDTO categorieDTO) {
+    public ResponseEntity<CategorieDTO> updateCategorie(@PathVariable Long id, @RequestBody CategorieDTO categorieDTO) throws JsonProcessingException {
         Optional<Categorie> existingCategorieOptional = categorieRepository.findById(id);
         if (existingCategorieOptional.isPresent()) {
             Categorie existingCategorie = existingCategorieOptional.get();
-            String oldValue = existingCategorie.toString(); // Get string representation of the old category
+            String oldValue = objectMapper.writeValueAsString(existingCategorie); // Get string representation of the old category
 
             existingCategorie.setNom(categorieDTO.getNom());
             existingCategorie.setDescription(categorieDTO.getDescription());
@@ -100,11 +111,16 @@ public class CategorieController {
         if (categorieRepository.existsById(id)) {
             try {
                 Categorie categorie = categorieRepository.findById(id).orElseThrow();
-                String oldValue = categorie.toString(); // Get string representation of the category before deletion
+                String oldValue = objectMapper.writeValueAsString(categorie); // Get string representation of the category before deletion
 
                 categorieRepository.deleteById(id);
                 logService.saveLog("Categorie", id, "delete", oldValue, null); // Log the deletion
 
+                List<Produit> produits = produitRepository.findByCategorieId(id);
+                for(Produit produit : produits){
+                    produit.setCategorie(null);
+                    produitRepository.save(produit);
+                }
                 return ResponseEntity.noContent().build();
             } catch (Exception e) {
                 e.printStackTrace();

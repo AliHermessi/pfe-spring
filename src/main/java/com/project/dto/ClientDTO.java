@@ -1,6 +1,9 @@
 package com.project.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
+
+import java.util.List;
 
 public class ClientDTO {
     private Long id;
@@ -13,8 +16,18 @@ public class ClientDTO {
 
     private String address;
 
+    @JsonIgnore
+    private List<Long> ListIdCommande;
     public ClientDTO() {
 
+    }
+
+    public List<Long> getListIdCommande() {
+        return ListIdCommande;
+    }
+
+    public void setListIdCommande(List<Long> listIdCommande) {
+        ListIdCommande = listIdCommande;
     }
 
     public Long getId() {

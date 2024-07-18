@@ -17,4 +17,12 @@ public interface CommandeRepository extends JpaRepository<Commande,Long> {
 
     @Query("SELECT c FROM Commande c WHERE UPPER(c.codeCommande) LIKE CONCAT('%', UPPER(:query), '%')")
     List<Commande> searchCommandes(String query);
+
+
+
+    List<Commande> findByFournisseurId(Long id);
+
+    List<Commande> findByClientId(Long id);
+
+    Commande getCommandeById(Long id);
 }

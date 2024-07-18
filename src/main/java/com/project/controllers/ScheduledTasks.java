@@ -6,7 +6,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ScheduledTasks {
+public class ScheduledTasks {/*
 
     @Autowired
     private NotificationService notificationService;
@@ -14,6 +14,6 @@ public class ScheduledTasks {
     @Scheduled(fixedRate = 300000, initialDelay = 1000) // Runs every 5 minutes, with initial delay of 1 second
     public void scheduledCheckProducts() {
         notificationService.checkProducts();
-    }
+    }*/
 }
 

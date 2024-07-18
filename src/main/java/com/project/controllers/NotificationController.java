@@ -15,7 +15,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/notifications")
-public class NotificationController {
+public class NotificationController {/*
     @Autowired
     private NotificationSseService notificationSseService;
     @Autowired
@@ -73,6 +73,6 @@ public class NotificationController {
         return emitter;
     }
 
-
+*/
 }
 

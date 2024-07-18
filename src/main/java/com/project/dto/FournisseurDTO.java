@@ -1,10 +1,15 @@
 package com.project.dto;
 
+import java.util.List;
+
 public class FournisseurDTO {
     private Long id;
     private String nom;
     private String address;
     private String numero;
+
+    private List<Long> ListIdCommande;
+    private List<Long> ListIdProduit;
 
     public FournisseurDTO() {
     }
@@ -14,6 +19,22 @@ public class FournisseurDTO {
         this.nom = nom;
         this.address = address;
         this.numero = numero;
+    }
+
+    public List<Long> getListIdCommande() {
+        return ListIdCommande;
+    }
+
+    public void setListIdCommande(List<Long> listIdCommande) {
+        ListIdCommande = listIdCommande;
+    }
+
+    public List<Long> getListIdProduit() {
+        return ListIdProduit;
+    }
+
+    public void setListIdProduit(List<Long> listIdProduit) {
+        ListIdProduit = listIdProduit;
     }
 
     public Long getId() {

@@ -15,9 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -38,6 +36,7 @@ public class DashboardController {
     @Autowired
     private ElementFactureRepository elementFactureRepository;
 
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
 
     @GetMapping("AllPVE")
@@ -93,18 +92,13 @@ public class DashboardController {
                     double netht = element.getNetHT();
 
                     // Debugging statements
-                    System.out.println("Produit ID: " + produit.getId());
-                    System.out.println("Quantity: " + quantity);
-                    System.out.println("Cout Value: " + coutValue);
-                    System.out.println("Net HT: " + netht);
-                    System.out.println("Total Cout: " + totalCout);
+
 
                     pve.setTotalCout(totalCout);
                     pve.setTotal(netht - totalCout);
 
                     // Additional debug statement to check for negative values
                     if (pve.getTotal() < 0) {
-                        System.out.println("Warning: Negative Total Value for Produit ID: " + produit.getId());
                     }
 
                     pve.setDate(commande.getDateCommande());
@@ -124,31 +118,29 @@ public class DashboardController {
 
     @GetMapping("TotalValues")
     public ResponseEntity<TotalValues> GeneralTotalValues(
-            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDate endDate) {
 
         List<CommandeDTO> ListCommaneDTO = convertCommandesToDTOs(commandeRepository.findAll());
 
         // Filter the list of commandeDTOs based on the start and end date
-        List<CommandeDTO> filteredCommandeDTOs = ListCommaneDTO.stream()
-                .filter(commande -> commande.getDateCommande() != null)
-                .filter(commande -> startDate == null || !commande.getDateCommande().isBefore(startDate.atStartOfDay()))
-                .filter(commande -> endDate == null || commande.getDateCommande().isBefore(endDate.plusDays(1).atStartOfDay()))
-                .collect(Collectors.toList());
+
 
         TotalValues totalvalues = new TotalValues();
         totalvalues.setTotalProduits(produitRepository.findAll().size());
-        totalvalues.setTotalCommande(filteredCommandeDTOs.size());
+        totalvalues.setTotalCommande(commandeRepository.findAll().size());
         totalvalues.setTotalFacture(factureRepository.findAll().size());
-
-        for (CommandeDTO commande : filteredCommandeDTOs) {
-            totalvalues.setTotalSales(totalvalues.getTotalSales()+commande.getElementsFacture().size());
+totalvalues.setTotalClient(clientRepository.findAll().size());
+totalvalues.setTotalFournisseur(fournisseurRepository.findAll().size());
+        for (CommandeDTO commande : ListCommaneDTO) {
             for (ElementFactureDTO element : commande.getElementsFacture()) {
                 double cost = 0;
                 if (commande.getType_commande().equals("IN")) {
                     cost = element.getPrix() * element.getQuantity();
                     totalvalues.setTotalCost(totalvalues.getTotalCost() + cost);
                 } else if (commande.getType_commande().equals("OUT")) {
+                    totalvalues.setTotalSales(totalvalues.getTotalSales()+element.getQuantity());
+
                     cost = produitRepository.findById(element.getProduitId()).get().getCout() * element.getQuantity();
                     totalvalues.setTotalRevenu(totalvalues.getTotalRevenu() + (element.getNetHT() - cost));
                 }
@@ -209,34 +201,80 @@ public class DashboardController {
         return mergedRecords;
     }
 
-    private final DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
 
     @GetMapping("/pourcentagePVE")
-    public ResponseEntity<Double> comparePVE(
-            @RequestParam String start1,
-            @RequestParam String end1,
-            @RequestParam String start2,
-            @RequestParam String end2) {
+    public  ResponseEntity<Map<String, Double>>  comparePVE() {
+        System.out.println("Comparing last 90 days with previous 90 days:");
 
-        LocalDateTime startDateTime1 = LocalDateTime.parse(start1, formatter);
-        LocalDateTime endDateTime1 = LocalDateTime.parse(end1, formatter);
-        LocalDateTime startDateTime2 = LocalDateTime.parse(start2, formatter);
-        LocalDateTime endDateTime2 = LocalDateTime.parse(end2, formatter);
+        // Calculate the current 90-day period (June, May, April)
+        LocalDateTime currentEndDateTime = LocalDateTime.now().minusDays(1); // End of the current period
+        LocalDateTime currentStartDateTime = currentEndDateTime.minusDays(89); // Start of the current period
 
-        List<PVE> records1 = getRecordProduitsInInterval(startDateTime1, endDateTime1);
-        List<PVE> records2 = getRecordProduitsInInterval(startDateTime2, endDateTime2);
+        // Calculate the previous 90-day period (March, February, January)
+        LocalDateTime previousEndDateTime = currentStartDateTime.minusDays(1); // End of the previous period
+        LocalDateTime previousStartDateTime = previousEndDateTime.minusDays(89); // Start of the previous period
+        List<PVE> pveList1 = new ArrayList<>();
+        List<PVE> pveList2 = new ArrayList<>();
 
-        double totalNetHT1 = records1.stream().mapToDouble(PVE::getTotal).sum();
-        double totalNetHT2 = records2.stream().mapToDouble(PVE::getTotal).sum();
+        // Adding sample data initialization
+        // Recent 90 days (5 records)
+        pveList1.add(new PVE(1L, "1234567890", "Produit A", "OUT", 5, 29.99, 15.0, 24.99, 75.0, 149.95,
+                LocalDateTime.of(2024, 6, 30, 0, 0), "Fournisseur A", "Catégorie A", "Client A"));
+        pveList1.add(new PVE(2L, "9876543210", "Produit B", "OUT", 3, 19.99, 12.0, 17.99, 36.0, 59.97,
+                LocalDateTime.of(2024, 6, 29, 0, 0), "Fournisseur B", "Catégorie B", "Client B"));
+        pveList1.add(new PVE(3L, "1357924680", "Produit C", "OUT", 7, 14.99, 8.0, 12.99, 56.0, 104.93,
+                LocalDateTime.of(2024, 6, 28, 0, 0), "Fournisseur C", "Catégorie C", "Client C"));
+        pveList1.add(new PVE(4L, "2468013579", "Produit D", "OUT", 2, 39.99, 20.0, 34.99, 40.0, 79.98,
+                LocalDateTime.of(2024, 6, 27, 0, 0), "Fournisseur D", "Catégorie D", "Client D"));
+        pveList1.add(new PVE(5L, "1122334455", "Produit E", "OUT", 4, 49.99, 25.0, 44.99, 100.0, 199.96,
+                LocalDateTime.of(2024, 6, 26, 0, 0), "Fournisseur E", "Catégorie E", "Client E"));
 
-        if (totalNetHT1 == 0 || totalNetHT2 == 0) {
-            return ResponseEntity.badRequest().body(0.0); // Avoid division by zero
-        }
+        // Previous 90 days (5 records)
+        pveList2.add(new PVE(6L, "9988776655", "Produit F", "OUT", 1, 9.99, 5.0, 8.99, 5.0, 9.99,
+                LocalDateTime.of(2024, 4, 10, 0, 0), "Fournisseur F", "Catégorie F", "Client F"));
+        pveList2.add(new PVE(7L, "7766554433", "Produit G", "OUT", 3, 29.99, 15.0, 24.99, 45.0, 89.97,
+                LocalDateTime.of(2024, 4, 9, 0, 0), "Fournisseur G", "Catégorie G", "Client G"));
+        pveList2.add(new PVE(8L, "5544332211", "Produit H", "OUT", 6, 19.99, 12.0, 17.99, 72.0, 119.94,
+                LocalDateTime.of(2024, 4, 8, 0, 0), "Fournisseur H", "Catégorie H", "Client H"));
+        pveList2.add(new PVE(9L, "1212121212", "Produit I", "OUT", 2, 14.99, 8.0, 12.99, 16.0, 29.98,
+                LocalDateTime.of(2024, 4, 7, 0, 0), "Fournisseur I", "Catégorie I", "Client I"));
+        pveList2.add(new PVE(10L, "1231231234", "Produit J", "OUT", 8, 9.99, 5.0, 8.99, 40.0, 79.92,
+                LocalDateTime.of(2024, 4, 6, 0, 0), "Fournisseur J", "Catégorie J", "Client J"));
 
+
+        // Retrieve records for the respective intervals
+        List<PVE> records1 = getRecordProduitsInInterval(previousStartDateTime, previousEndDateTime);
+        List<PVE> records2 = getRecordProduitsInInterval(currentStartDateTime, currentEndDateTime);
+
+        double totalNetHT1 = pveList1.stream().mapToDouble(PVE::getTotal).sum();
+        double totalNetHT2 = pveList2.stream().mapToDouble(PVE::getTotal).sum();
+
+        // Calculate total cost for both periods
+        double totalCost1 = pveList1.stream().mapToDouble(PVE::getTotalCout).sum();
+        double totalCost2 = pveList2.stream().mapToDouble(PVE::getTotalCout).sum();
+
+        // Calculate total sales (quantity sold) for both periods
+        int totalSales1 = pveList1.stream().mapToInt(PVE::getQuantity).sum();
+        int totalSales2 = pveList2.stream().mapToInt(PVE::getQuantity).sum();
+
+        // Calculate growth percentage
         double growthPercentage = ((totalNetHT2 - totalNetHT1) / totalNetHT1) * 100;
 
-        return ResponseEntity.ok(growthPercentage);
+        // Calculate cost percentage
+        double costPercentage = ((totalCost2 - totalCost1) / totalCost1) * 100;
+
+        // Calculate sales percentage
+        double salesPercentage = ((totalSales2 - totalSales1) / (double) totalSales1) * 100;
+
+        // Prepare response with all three percentages
+        Map<String, Double> percentages = new HashMap<>();
+        percentages.put("growthPercentage", growthPercentage);
+        percentages.put("costPercentage", costPercentage);
+        percentages.put("salesPercentage", salesPercentage);
+System.out.println(percentages);
+        return ResponseEntity.ok(percentages);
     }
+
 
 
 

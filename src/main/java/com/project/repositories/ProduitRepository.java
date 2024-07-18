@@ -12,7 +12,7 @@ import java.util.Optional;
 
 @Repository
 public interface ProduitRepository extends JpaRepository<Produit, Long> {
-
+    List<Produit> findByFournisseurId(Long fournisseurId);
     @Query("SELECT p FROM Produit p WHERE UPPER(p.libelle) LIKE CONCAT('%', UPPER(:query), '%') OR " +
             "UPPER(p.barcode) LIKE CONCAT('%', UPPER(:query), '%') OR " +
             "UPPER(p.description) LIKE CONCAT('%', UPPER(:query), '%')")
@@ -28,5 +28,5 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
     Produit findByBarCodeAndLibelle(String refProduit,String libelle);
 
 
-
+    List<Produit> findByCategorieId(Long id);
 }

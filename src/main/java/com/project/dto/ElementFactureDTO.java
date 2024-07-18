@@ -3,7 +3,7 @@ package com.project.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class ElementFactureDTO {
-
+private long elementFactureId;
     @JsonProperty("ProduitId")
     private long produitId;
 private String refProduit;
@@ -18,6 +18,14 @@ private String refProduit;
     private int minStock;
 
     public ElementFactureDTO() {
+    }
+
+    public long getElementFactureId() {
+        return elementFactureId;
+    }
+
+    public void setElementFactureId(long elementFactureId) {
+        this.elementFactureId = elementFactureId;
     }
 
     public long getProduitId() {

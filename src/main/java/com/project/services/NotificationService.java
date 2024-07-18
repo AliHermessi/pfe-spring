@@ -20,7 +20,7 @@ import java.util.Optional;
 
 @Service
 public class NotificationService {
-
+/*
     private final List<SseEmitter> emitters = new ArrayList<>();
 
     @Autowired
@@ -190,6 +190,6 @@ public class NotificationService {
 
     private boolean isNullOrEmpty(String str) {
         return str == null || str.trim().isEmpty();
-    }
+    }*/
 }
 

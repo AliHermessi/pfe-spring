@@ -1,15 +1,19 @@
 package com.project.controllers;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.dto.ClientDTO;
 import com.project.models.Client;
+import com.project.models.Commande;
 import com.project.repositories.ClientRepository;
+import com.project.repositories.CommandeRepository;
 import com.project.services.LogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,7 +26,8 @@ public class ClientController {
     @Autowired
     private ClientRepository clientRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
+    @Autowired
+    private CommandeRepository commandeRepository;
     @GetMapping("/getAll")
     public ResponseEntity<List<ClientDTO>> getAllClients() {
         List<Client> clients = clientRepository.findAll();
@@ -46,7 +51,8 @@ public class ClientController {
     public ResponseEntity<Void> addClient(@RequestBody Client client) {
         try {
             clientRepository.save(client);
-            logService.saveLog("Client", client.getId(), "add", null, null);
+            logService.saveLog("Client", client.getId(), "add", null,
+                    objectMapper.writeValueAsString(client));
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             e.printStackTrace();
@@ -56,12 +62,13 @@ public class ClientController {
 
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<ClientDTO> updateClient(@PathVariable Long id, @RequestBody Client newClient) {
+    public ResponseEntity<?> updateClient(@PathVariable Long id, @RequestBody ClientDTO newClient)
+            throws JsonProcessingException {
         Optional<Client> existingClientOpt = clientRepository.findById(id);
         if (existingClientOpt.isPresent()) {
             Client existingClient = existingClientOpt.get();
 
-            String oldValue = existingClient.toString(); // Get string representation of the old client
+            String oldValue = objectMapper.writeValueAsString(existingClient); // Get string representation of the old client
 
             existingClient.setNom(newClient.getNom());
             existingClient.setEmail(newClient.getEmail());
@@ -70,7 +77,7 @@ public class ClientController {
 
             clientRepository.save(existingClient);
 
-            String newValue = existingClient.toString(); // Get string representation of the updated client
+            String newValue = objectMapper.writeValueAsString(existingClient); // Get string representation of the updated client
             logService.saveLog("Client", id, "update", oldValue, newValue); // Log the changes
 
             return ResponseEntity.ok().build();
@@ -85,11 +92,15 @@ public class ClientController {
         if (clientRepository.existsById(id)) {
             try {
                 Client client = clientRepository.findById(id).orElseThrow();
-                String oldValue = client.toString(); // Get string representation of the client before deletion
+                String oldValue = objectMapper.writeValueAsString(client); // Get string representation of the client before deletion
 
                 clientRepository.deleteById(id);
                 logService.saveLog("Client", id, "delete", oldValue, null); // Log the deletion
-
+                List<Commande> commandes = commandeRepository.findByClientId(id);
+                for(Commande commande : commandes){
+                    commande.setClient(null);
+                    commandeRepository.save(commande);
+                }
                 return ResponseEntity.noContent().build();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -108,7 +119,12 @@ public class ClientController {
         clientDTO.setEmail(client.getEmail());
         clientDTO.setNumero_telephone(client.getNumero_telephone());
         clientDTO.setAddress(client.getAddress());
-        // Assuming commandes conversion if needed
+        List<Commande> commandes = commandeRepository.findByClientId(client.getId());
+        List<Long> ids = new ArrayList<>();
+        for(Commande commande : commandes){
+            ids.add(commande.getId());
+        }
+        clientDTO.setListIdCommande(ids);
         return clientDTO;
     }
 

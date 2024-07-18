@@ -23,6 +23,26 @@ public class PVE {
     public PVE() {
     }
 
+    public PVE(Long produitId, String barcode, String libelle, String type_commande, int quantity,
+               double prix, double cout, double netHT, double totalCout,
+               double total, LocalDateTime date, String fournisseurName,
+               String categorieName, String clientName) {
+        this.produitId = produitId;
+        this.barcode = barcode;
+        this.libelle = libelle;
+        this.type_commande = type_commande;
+        this.quantity = quantity;
+        this.prix = prix;
+        this.cout = cout;
+        this.netHT = netHT;
+        this.totalCout = totalCout;
+        this.total = total;
+        this.date = date;
+        this.fournisseurName = fournisseurName;
+        this.categorieName = categorieName;
+        this.clientName = clientName;
+    }
+
     public double getTotalCout() {
         return totalCout;
     }

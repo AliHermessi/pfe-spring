@@ -1,5 +1,6 @@
 package com.project.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import java.util.List;
@@ -23,10 +24,11 @@ public class Fournisseur {
     private String numero;
 
     @OneToMany
-    @JsonManagedReference
+    @JsonIgnore
     private List<Produit> produits;
 
     @OneToMany (mappedBy = "fournisseur")
+    @JsonIgnore
     private List<Commande> commandes;
 
     public Fournisseur() {

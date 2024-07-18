@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -24,7 +25,11 @@ public class logsController {
         List<log> logs = logRepository.findAll();
         return ResponseEntity.ok(logs);
     }
-
+    public List<log> getProduitRetourneLogs() {
+        List<log> logs = new ArrayList<>();
+        logs = logRepository.findByAction("Produit retourné");
+        return logs;
+    }
 
 
 

@@ -1,5 +1,6 @@
 package com.project.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.*;
@@ -26,6 +27,7 @@ public class Client {
     private String address;
 
     @OneToMany(mappedBy = "client")
+    @JsonIgnore
     private List<Commande> commandes;
     public Client(){
 

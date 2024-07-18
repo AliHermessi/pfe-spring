@@ -2,6 +2,7 @@ package com.project.models;
 import java.time.LocalDateTime;
 import java.util.Random;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 
@@ -23,17 +24,20 @@ public class Commande {
     @JsonManagedReference
     private Facture facture;
 
+    @JsonIgnore
     private LocalDateTime dateCommande;
     private BigDecimal montantTotal;
     private double montantTotalht;
     private double montantTotalttc;
 
+    private String addressLivraison;
     private double totalTax;
     private double totalRemise;
 
     private String codeCommande;
     private String type_commande;
 
+    private boolean BDLisPrinted;
     @ManyToOne
     private Client client;
 
@@ -59,6 +63,21 @@ public class Commande {
         return Integer.toString(randomNumber);
     }
 
+    public boolean isBDLisPrinted() {
+        return BDLisPrinted;
+    }
+
+    public void setBDLisPrinted(boolean BDLisPrinted) {
+        this.BDLisPrinted = BDLisPrinted;
+    }
+
+    public String getAddressLivraison() {
+        return addressLivraison;
+    }
+
+    public void setAddressLivraison(String addressLivraison) {
+        this.addressLivraison = addressLivraison;
+    }
 
     public double getMontantTotalht() {
         return montantTotalht;

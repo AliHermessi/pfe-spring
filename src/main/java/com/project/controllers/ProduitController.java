@@ -76,7 +76,7 @@ public class ProduitController {
         produit.setLast_update(LocalDateTime.now().toString());
         produit.setStatus(produitDTO.getStatus());
         produit.setBarcode(generateBarcodeWithReturn(produit));
-
+        produit.setDisponible(true);
         // Retrieve Categorie and Fournisseur objects from their IDs
         Categorie categorie = categorieRepository.findById(produitDTO.getCategorieId())
                 .orElseThrow(() -> new ChangeSetPersister.NotFoundException());
@@ -99,7 +99,7 @@ public class ProduitController {
 
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<ProduitDTO> updateProduit(@PathVariable Long id, @RequestBody Produit newProduit) {
+    public ResponseEntity<ProduitDTO> updateProduit(@PathVariable Long id, @RequestBody Produit newProduit) throws JsonProcessingException {
         Optional<Produit> existingProduitOpt = produitRepository.findById(id);
         if (existingProduitOpt.isPresent()) {
             Produit existingProduit = existingProduitOpt.get();
@@ -120,7 +120,7 @@ public class ProduitController {
             oldProduit.setBarcode(existingProduit.getBarcode());
             oldProduit.setBrand(existingProduit.getBrand());
             oldProduit.setCout(existingProduit.getCout());
-
+            oldProduit.setDisponible(existingProduit.isDisponible());
             // Update the existing product
             existingProduit.setLibelle(newProduit.getLibelle());
             existingProduit.setDescription(newProduit.getDescription());
@@ -135,12 +135,13 @@ public class ProduitController {
             existingProduit.setBarcode(newProduit.getBarcode());
             existingProduit.setBrand(newProduit.getBrand());
             existingProduit.setCout(newProduit.getCout());
-
+            existingProduit.setDisponible(newProduit.isDisponible());
             // Save the updated product
             produitRepository.save(existingProduit);
 
             // Log the action
-            logService.saveLog("Produit", existingProduit.getId(), "update", oldProduit, existingProduit);
+            logService.saveLog("Produit", existingProduit.getId(), "update",
+                    objectMapper.writeValueAsString(oldProduit), objectMapper.writeValueAsString(existingProduit));
 
             ProduitDTO produitDTO = convertToDTO(existingProduit);
             return ResponseEntity.ok(produitDTO);
@@ -159,10 +160,25 @@ public class ProduitController {
         produitDTO.setTax(produit.getTax());
         produitDTO.setQuantite(produit.getQuantite());
         produitDTO.setDate_arrivage(produit.getDate_arrivage());
-        produitDTO.setCategorieId(produit.getCategorie().getId());
-        produitDTO.setCategorieName(produit.getCategorie().getNom());
-        produitDTO.setFournisseurId(produit.getFournisseur().getId());
-        produitDTO.setFournisseurName(produit.getFournisseur().getNom());
+        produitDTO.setDisponible(produit.isDisponible());
+        // Set default values if categorie is null
+        if (produit.getCategorie() == null) {
+            produitDTO.setCategorieId(-1L); // Default categorieId
+            produitDTO.setCategorieName(""); // Default categorieName
+        } else {
+            produitDTO.setCategorieId(produit.getCategorie().getId());
+            produitDTO.setCategorieName(produit.getCategorie().getNom());
+        }
+
+        // Set default values if fournisseur is null
+        if (produit.getFournisseur() == null) {
+            produitDTO.setFournisseurId(-1L); // Default fournisseurId
+            produitDTO.setFournisseurName(""); // Default fournisseurName
+        } else {
+            produitDTO.setFournisseurId(produit.getFournisseur().getId());
+            produitDTO.setFournisseurName(produit.getFournisseur().getNom());
+        }
+
         produitDTO.setLast_update(produit.getLast_update());
         produitDTO.setStatus(produit.getStatus());
         produitDTO.setBarcode(produit.getBarcode());
@@ -170,18 +186,21 @@ public class ProduitController {
         produitDTO.setCout(produit.getCout());
         produitDTO.setMaxStock(produit.getMaxStock());
         produitDTO.setMinStock(produit.getMinStock());
+
         return produitDTO;
     }
 
+
     @DeleteMapping("/delete/{id}")
-    public ResponseEntity<Void> deleteProduit(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteProduit(@PathVariable Long id) throws JsonProcessingException {
         Optional<Produit> existingProduitOpt = produitRepository.findById(id);
         if (existingProduitOpt.isPresent()) {
             Produit existingProduit = existingProduitOpt.get();
             produitRepository.deleteById(id);
 
             // Log the action
-            logService.saveLog("Produit", id, "delete", existingProduit, null);
+            logService.saveLog("Produit", id, "delete",
+                    objectMapper.writeValueAsString(existingProduit), null);
 
             return ResponseEntity.noContent().build();
         } else {

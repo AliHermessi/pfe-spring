@@ -1,12 +1,14 @@
 package com.project.dto;
 
+import java.util.List;
+
 public class CategorieDTO {
 
     private Long id;
     private String nom;
     private String description;
 
-
+private List<Long> ListIdProduit;
     public CategorieDTO() {
     }
 
@@ -15,6 +17,14 @@ public class CategorieDTO {
         this.id = id;
         this.nom = nom;
         this.description = description;
+    }
+
+    public List<Long> getListIdProduit() {
+        return ListIdProduit;
+    }
+
+    public void setListIdProduit(List<Long> listIdProduit) {
+        ListIdProduit = listIdProduit;
     }
 
     // Getters and Setters

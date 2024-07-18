@@ -2,27 +2,28 @@ package com.project.controllers;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.project.dto.CommandeDTO;
-import com.project.dto.ElementFactureDTO;
-import com.project.dto.ProduitDTO;
+import com.project.dto.*;
 import com.project.models.*;
 import com.project.repositories.*;
 import com.project.services.LogService;
+import com.project.services.PdfGenerator;
+import com.project.services.PdfGeneratorBDL;
+import com.project.services.PdfGeneratorCommande;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.project.models.Facture.generateFactureCode;
+import org.json.JSONObject;
 
 @RestController
 @RequestMapping("/commandes")
@@ -38,18 +39,33 @@ public class CommandeController {
 
     @Autowired
     private FactureRepository factureRepository;
-
+    @Autowired
+    private EntrepriseRepository companyrepository;
     @Autowired
     private ProduitRepository produitRepository;
     @Autowired
     private ElementFactureRepository elementFactureRepository;
     @Autowired
     private LogService logService;
+    @Autowired
+    LogRepository logRepository;
     @GetMapping("/getAll")
     public ResponseEntity<List<CommandeDTO>> getAllCommandes() {
         List<Commande> commandes = commandeRepository.findAll();
         List<CommandeDTO> commandeDTOs = convertToDTOs(commandes);
         return ResponseEntity.ok(commandeDTOs);
+    }
+
+    @GetMapping("/get/{id}")
+    public ResponseEntity<CommandeDTO> getCommandeById(@PathVariable Long id) {
+        Optional<Commande> commandeOpt = commandeRepository.findById(id);
+        if (commandeOpt.isPresent()) {
+            Commande commande = commandeOpt.get();
+            CommandeDTO commandeDTO = convertToDTO(commande);
+            return ResponseEntity.ok(commandeDTO);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PostMapping("/createFacture")
@@ -65,7 +81,8 @@ public class CommandeController {
             factureRepository.save(facture);
 
             // Log the creation of the Facture
-            logService.saveLog("Facture", facture.getId(), "create", null, null);
+            logService.saveLog("Facture", facture.getId(), "create", null,
+                    objectMapper.writeValueAsString(facture));
 
             return ResponseEntity.ok(facture);
         } catch (Exception e) {
@@ -197,7 +214,6 @@ public class CommandeController {
                     produit.setCout(elementFactureDTO.getPrix());
                     }
                     produit.setTax((int)elementFactureDTO.getTax());
-                    produit.setQuantite(produit.getQuantite() + elementFactureDTO.getQuantity());
                     // Set other properties like prix, tax, remise, last_update, etc.
                     // Save updated produit
                     produitRepository.save(produit);
@@ -219,15 +235,29 @@ public class CommandeController {
             factureRepository.updateFactureCommandeId(facture.getId(),commande);
             // Update and save the Commande entity with the Facture entity
             commande.setFacture(facture);
+            commande.setMontantTotal(commandeDTO.getMontantTotal());
+            commande.setMontantTotalht(commandeDTO.getMontantTotalht());
+            commande.setMontantTotalttc(commandeDTO.getMontantTotalttc());
+            commande.setTotalRemise(commandeDTO.getTotalRemise());
+            commande.setTotalTax(commandeDTO.getTotalRemise());
+            commande.setAddressLivraison(commandeDTO.getAdresse());
+            commande.setBDLisPrinted(false);
             commandeRepository.save(commande);
+
+            commande.setDateCommande(null);
             try {
-                logService.saveLog("Commande", commande.getId(),
-                        "Saving Commande", null, objectMapper.writeValueAsString(commandeDTO));
+                if(commandeDTO.getId()!= null) {
+                    logService.saveLog("Commande", commande.getId(),
+                            "Modifier commande", null, objectMapper.writeValueAsString(commande));
+                } else {
+                    logService.saveLog("Commande", commande.getId(),
+                            "Enregistrer commande", null, objectMapper.writeValueAsString(commande));
+                }
             } catch (JsonProcessingException e) {
                 e.printStackTrace(); // Handle exception properly
             }
 
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok(commande.getCodeCommande());
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -236,7 +266,7 @@ public class CommandeController {
 
 
     @PostMapping("/ConvertirCommandeEtCreerFacture")
-    public ResponseEntity<Void> convertirCommande(@RequestBody Long id) {
+    public ResponseEntity<Long> convertirCommande(@RequestBody Long id) {
         try {
             // Retrieve Commande entity by ID
             Optional<Commande> commandeOpt = commandeRepository.findById(id);
@@ -247,10 +277,7 @@ public class CommandeController {
 
             Commande commande = commandeOpt.get();
 
-            // Log before converting Commande
-           // String oldValue = objectMapper.writeValueAsString(commande);
-
-            // Convert Commande and update Facture
+            
             Facture facture = commande.getFacture();
             facture.setGenerated(Boolean.TRUE);
             facture.setDateFacture(LocalDateTime.now());
@@ -266,25 +293,17 @@ public class CommandeController {
 
             // Log after converting Commande
           //  String newValue = objectMapper.writeValueAsString(commande);
-            logService.saveLog("Facture", id, "Convertir Commande et Creer Facture", "", "");
+            logService.saveLog("Facture", id, "facture a été créer d'après le commande" +
+                            "de code ="+ commande.getCodeCommande(), null,
+                    objectMapper.writeValueAsString(facture));
 
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok(facture.getId());
         } catch (Exception e) {
             // Handle JSON processing exception
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
-
-
-
-
-
-
-
-    // Method to generate Facture code
-
 
 
 
@@ -332,7 +351,6 @@ public class CommandeController {
             commandeDTO.setClientName(commande.getClient().getNom());
             commandeDTO.setType_commande("OUT");
             commandeDTO.setNumero(commande.getClient().getNumero_telephone());
-            commandeDTO.setAdresse(commande.getClient().getAddress());
         }
 
         if (commande.getFournisseur() != null) {
@@ -340,7 +358,6 @@ public class CommandeController {
             commandeDTO.setFournisseurName(commande.getFournisseur().getNom());
             commandeDTO.setType_commande("IN");
             commandeDTO.setNumero(commande.getFournisseur().getNumero());
-            commandeDTO.setAdresse(commande.getFournisseur().getAddress());
         }
 
         List<ElementFacture> elementFacturesAll = elementFactureRepository.findByCommande(commande);
@@ -352,6 +369,8 @@ public class CommandeController {
                 elementFacturesDTO.add(elementFactureDTO);
 
         }
+        commandeDTO.setBDLisPrinted(commande.isBDLisPrinted());
+        commandeDTO.setAdresse(commande.getAddressLivraison());
 commandeDTO.setElementsFacture(elementFacturesDTO);
         return commandeDTO;
     }
@@ -377,7 +396,8 @@ commandeDTO.setElementsFacture(elementFacturesDTO);
 
     private ElementFactureDTO convertElementFactureToDTO(ElementFacture elementFacture){
         ElementFactureDTO elementFactureDTO =new ElementFactureDTO() ;
-        elementFactureDTO.setProduitId(elementFacture.getId());
+        elementFactureDTO.setElementFactureId(elementFacture.getId());
+        elementFactureDTO.setProduitId(elementFacture.getProduit().getId());
         elementFactureDTO.setRefProduit(elementFacture.getRefcode());
         elementFactureDTO.setLibelle(elementFacture.getLibelle());
         elementFactureDTO.setPrix(elementFacture.getPrix());
@@ -387,15 +407,206 @@ commandeDTO.setElementsFacture(elementFacturesDTO);
         return elementFactureDTO;
     }
 
-    @PostMapping("/printBonLivraison")
-    public ResponseEntity<String> printBonLivraison(@RequestBody CommandeDTO commandeDTO) {
-
-
-        return null;
+    @GetMapping("/generatePdfBDL/{id}")
+    public ResponseEntity<byte[]> generatePdfBDL (@PathVariable Long id, @RequestParam String user) {
+        try {
+            Commande commande = commandeRepository.getCommandeById(id);
+            CommandeDTO commandeDTO = convertToDTO(commande);
+            Entreprise entreprise = (companyrepository.findById(Long.valueOf(1))).get();
+            byte[] pdfBytes = PdfGeneratorBDL.generatePdf(commandeDTO,entreprise,user);
+            //commande.setBDLisPrinted(true);
+           // commandeRepository.save(commande);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("filename", "commande.pdf");
+            headers.setContentLength(pdfBytes.length);
+            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+        } catch (Exception e) {
+            System.out.println("Error generating PDF: " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    @GetMapping("/generatePdfCommande/{id}")
+    public ResponseEntity<byte[]> generatePdfCommande(@PathVariable Long id, @RequestParam String user) {
+        try {
+            Commande commande = commandeRepository.getCommandeById(id);
+            CommandeDTO commandeDTO = convertToDTO(commande);
+            Entreprise entreprise = (companyrepository.findById(Long.valueOf(1))).get();
+            byte[] pdfBytes = PdfGeneratorCommande.generatePdf(commandeDTO,entreprise,user);
+            // Send PDF bytes as response
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("filename", "commande.pdf");
+            headers.setContentLength(pdfBytes.length);
+            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+        } catch (Exception e) {
+            System.out.println("Error generating PDF: " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
 
+    @PostMapping("/updateStatusAndQuantity")
+    public ResponseEntity<?> updateStatusAndQuantity(@RequestBody UpdateRequest updateRequest) throws JsonProcessingException {
+        Optional<Commande> optionalCommande = commandeRepository.findById(updateRequest.getCommandeId());
+        if (!optionalCommande.isPresent()) {
+            return ResponseEntity.badRequest().body("Commande not found");
+        }
+
+        Commande commande = optionalCommande.get();
+        Optional<ElementFacture> optionalElementFacture = elementFactureRepository.findById(updateRequest.getElementFactureId());
+        if (!optionalElementFacture.isPresent()) {
+            return ResponseEntity.badRequest().body("ElementFacture not found");
+        }
+
+        ElementFacture elementFacture = optionalElementFacture.get();
+        int newQuantity = elementFacture.getQuantity() - updateRequest.getQuantity();
+        if (newQuantity < 0) {
+            return ResponseEntity.badRequest().body("Insufficient quantity");
+        }
+        elementFacture.setQuantity(newQuantity);
+
+        ElementFactureDTO elementFactureDTO = convertElementFactureToDTO(elementFacture);
+        System.out.println(elementFactureDTO.getProduitId());
+        Optional<Produit> optionalProduit = produitRepository.findById(elementFactureDTO.getProduitId());
+        if (optionalProduit.isEmpty()) {
+            return ResponseEntity.badRequest().body("Produit not found");
+        }
+
+        Produit produit = optionalProduit.get();
+        if(!Objects.equals(updateRequest.getStatus(), "")) {
+            produit.setStatus(updateRequest.getStatus());
+        }
+        if(!Objects.equals(updateRequest.getDescription(), "")) {
+            produit.setDescription(updateRequest.getDescription());
+        }
+        produit.setQuantite(produit.getQuantite() + updateRequest.getQuantity());
+        elementFactureRepository.save(elementFacture);
+        produitRepository.save(produit);
+        logService.saveLog("Produit",produit.getId(),"Produit retourné",objectMapper.writeValueAsString(updateRequest),"");
+        return ResponseEntity.ok("Product updated successfully");
+    }
+
+    @GetMapping("/produit-retourné")
+    public ResponseEntity<?> getProduits() {
+        List<log> logs = logRepository.findByAction("Produit retourné");
+        System.out.println(logs.size());
+        List<ProcessedLogDTO> processedLogs = new ArrayList<>();
+
+        for (log loge : logs) {
+            // Extract JSON string from oldValue starting from first { to matching }
+            String oldValue = extractJsonFromLog(loge.getOldValue());
+
+            if (oldValue != null) {
+                // Remove backslashes from the captured JSON string
+                String cleanedJson = oldValue.replace("\\", "");
+                // Parse the cleaned JSON string
+                JSONObject oldValueJson = new JSONObject(cleanedJson);
+                // Extract quantity, status, and description from JSON
+                int quantity = oldValueJson.getInt("quantity");
+                String status = oldValueJson.getString("status");
+                String description = oldValueJson.getString("description");
+
+                // Extract Commande ID and ElementFacture ID
+                Long commandeId = oldValueJson.getLong("commandeId");
+                Long elementFactureId = oldValueJson.getLong("elementFactureId");
+
+                // Fetch Commande from repository
+                Commande commande = commandeRepository.findById(commandeId).orElse(null);
+
+                if (commande != null) {
+                    // Fetch ElementFacture from Commande
+                    ElementFacture elementFacture = null;
+                    for (ElementFacture ef : commande.getElementsFacture()) {
+                        if (ef.getId().equals(elementFactureId)) {
+                            elementFacture = ef;
+                            break;
+                        }
+                    }
+
+                    if (elementFacture != null) {
+                        // Convert ElementFacture entity to DTO
+                        ElementFactureDTO elementFactureDTO = convertElementFactureToDTO(elementFacture);
+
+                        // Fetch Produit details from repository
+                        Produit produit = produitRepository.findById(elementFacture.getProduit().getId()).orElse(null);
+
+                        if (produit != null) {
+                            // Prepare data for table
 
 
-}
+                            ProcessedLogDTO processedLog = new ProcessedLogDTO();
+                            processedLog.setLogId(loge.getId());
+                            processedLog.setProduitLibelle(produit.getLibelle());
+                            processedLog.setProduitBarcode(produit.getBarcode());
+                            processedLog.setCommandeId(commande.getId());
+                            processedLog.setDescription(description); // Set description from JSON
+                            processedLog.setStatus(status); // Set status from JSON
+                            processedLog.setQuantity(quantity); // Set quantity from JSON
+                            processedLog.setElementFactureId(elementFacture.getId());
+
+                            // Add processed log to list
+                            processedLogs.add(processedLog);
+                        }
+                    }
+                }
+            }
+        }
+        System.out.println(processedLogs);
+        return ResponseEntity.ok(processedLogs);
+    }
+
+    // Method to extract JSON string starting from first { to matching }
+    private String extractJsonFromLog(String oldValue) {
+        int start = oldValue.indexOf("{");
+        if (start != -1) {
+            int end = oldValue.lastIndexOf("}");
+            if (end != -1) {
+                return oldValue.substring(start, end + 1);
+            }
+        }
+        return null; // Return null if no valid JSON found
+    }
+
+    @PostMapping("/update-log")
+    public ResponseEntity<String> updateLog(@RequestBody UpdateRequest request) throws JsonProcessingException {
+        Long logId = request.getLogId();
+        int quantityToAdd = request.getQuantity();
+        String status = request.getStatus();
+        String description = request.getDescription();
+        Long elementId = request.getElementFactureId();
+        logRepository.delete(logRepository.findById(logId).get());
+        ElementFacture elementFacture = elementFactureRepository.findById(elementId).get();
+        if (elementFacture != null) {
+            // Update quantity
+            elementFacture.setQuantity(elementFacture.getQuantity() + quantityToAdd);
+            elementFactureRepository.save(elementFacture);
+
+            // Update Produit
+            Produit produit = produitRepository.findById(elementFacture.getProduit().getId()).orElse(null);
+            if (produit != null) {
+                // Update quantity in Produit
+                produit.setQuantite(produit.getQuantite() + quantityToAdd);
+                // Update description and status
+                produit.setDescription(description);
+                produit.setStatus(status);
+                produitRepository.save(produit);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Create new log entry
+           // logService.saveLog("Produit", produit.getId(),"Produit non retourné","",
+           //         objectMapper.writeValueAsString(request) ); // Assuming logService.saveLog() exists
+
+            return ResponseEntity.ok("Log updated successfully.");
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+
+    }
 

@@ -55,6 +55,8 @@ public class Produit {
     @Column(name = "brand")
     private String brand;
 
+    private boolean isDisponible;
+
     @ManyToOne
     @JoinColumn(name = "categorie_id", referencedColumnName = "id")
     @JsonIgnore
@@ -96,6 +98,14 @@ public class Produit {
 
     public Produit() {
 
+    }
+
+    public boolean isDisponible() {
+        return isDisponible;
+    }
+
+    public void setDisponible(boolean disponible) {
+        isDisponible = disponible;
     }
 
     public List<ElementFacture> getElementFactures() {
